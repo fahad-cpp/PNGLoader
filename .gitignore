@@ -1,6 +1,9 @@
 .gitignore
 .vscode/*
+*.bin
+imageoutput.ppm
 output/*
 bin/*
 build/*
 references/*
+build.bat
