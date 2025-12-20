@@ -5,7 +5,7 @@
 #include <cstring>
 #include <cstdint>
 #include <math.h>
-
+#include "HuffmanTree.h"
 typedef unsigned int u32;
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -208,20 +208,24 @@ public:
                 //skip data
                 reader += blockLength;
             }else if(compressionType == BTYPE_FIXED_HUFFMAN){
+                bool lastBlock = false;
+                // HuffmanTree tree;
+                // tree.initializeStaticDeflateTree();
+                // while(!lastBlock){
+                //     u32 code = 0;
+                //     for(int i=0;i<9;i++){
+                //         bit = read_bit(reader);
+                //         code = (code << 1) | bit;
+
+                //         if(code >= tree.first_code[i] && code < (tree.first_code[i] + tree.codes[i])){
+                //             int index = tree.first_symbol[i] + (code - tree.first_code[i]);
+                //             u32 symbol = tree.symbols[index];
+                //             break;
+                //         }
+                //     }
+                // }
                 std::cout <<"Unhandled Deflate block:BTYPE_FIXED_HUFFMAN\n";
-                bool endBlock = false;
-                while(!endBlock){
-                    if(*reader < 256){
-                        staticHuffmanBuffer.push_back(u8(*reader));
-                    }else if(*reader == 256){
-                        std::cout << "-end of block\n";
-                        endBlock = true;
-                    }else{
-                        std::cout << "-compressed data shi that i dont understand\n";
-                    }
-                    reader++;
-                }
-               // return false;
+                return false;
             }else if(compressionType == BTYPE_DYNAMIC_HUFFMAN){
                 std::cout <<"Unhandled deflate block:BTYPE_DYNAMIC_HUFFMAN\n";
                 return false;
@@ -296,7 +300,6 @@ const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
         //skip filter byte
         reader += 1;
         prevPixel = {0,0,0};
-        //Per Pixel
          /*
                c       b
             |R|G|B| |R|G|B|
@@ -312,10 +315,11 @@ const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
             3 = average : reconstructed x[channel] = filtered x[channel] + floor((filtered a[channel] + filtered b[channel]) / 2)
             4 = paeth   : reconstructed x[channel] = filtered x[channel] + paeth(a,b,c)
         */
+        //Per Pixel
         for(u32 x=0;x<width;x++){
-            //Per channel
             Pixel curPixel = {0,0,0};
-           
+            
+            //Per channel
             for(u32 i=0;i<3;i++){
                 u8 value=0;
                 u8 a = (x>0?prevPixel.getChannel(i):0);
@@ -348,14 +352,16 @@ void deleteBuffer(const u8* buffer){
     free((void*)buffer);
 }
 void defilterAndOutput(const u8* buffer,u32 width,u32 height){
-    
+    //Get Defiltered Buffer
+    const u8* rgbBuffer = createDefilteredBuffer(buffer,width,height);
+
+    //Output Image to ppm
     std::ofstream ofs;
     ofs.open("imageoutput.ppm");
     if(!ofs.is_open()){
         std::cout << "Failed to open imageoutput.ppm\n";
         return;
     }
-    const u8* rgbBuffer = createDefilteredBuffer(buffer,width,height);
     const u8* reader = rgbBuffer;
     ofs << "P3\n" << width << " " <<  height <<"\n255\n";   
     //Per Scanline
@@ -371,7 +377,7 @@ void defilterAndOutput(const u8* buffer,u32 width,u32 height){
         }
     }
     
-    deleteBuffer(rgbBuffer);    
+    deleteBuffer(rgbBuffer);
     ofs.close();
 }
 
@@ -384,25 +390,29 @@ int main(int argc,char* argv[]) {
     const std::string filepath = argc<2?"..\\res\\dbh.png":argv[1];
     Parser parser;
     ParsedData parsedData;
-    if (parser.parse(filepath, parsedData)) {
-        std::cout<<"---PNG--info---\n";
-        std::cout << "IHDR:\n";
-        std::cout << "\tWidth: " << parsedData.width << "\n";
-        std::cout << "\tHeight: " << parsedData.height << "\n";
-        std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
-        std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
-        std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
-        std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
-        std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
-        std::cout << "IDAT:\n";
+    // if (parser.parse(filepath, parsedData)) {
+    //     std::cout<<"---PNG--info---\n";
+    //     std::cout << "IHDR:\n";
+    //     std::cout << "\tWidth: " << parsedData.width << "\n";
+    //     std::cout << "\tHeight: " << parsedData.height << "\n";
+    //     std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
+    //     std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
+    //     std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
+    //     std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
+    //     std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
+    //     std::cout << "IDAT:\n";
 
-        std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
-    }else{
-        return 1;
-    }
-    defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
-    std::cout<<"Successfully parsed the png\n";
+    //     std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
+    // }else{
+    //     return 1;
+    // }
+    // defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
+    // std::cout<<"Successfully parsed the png\n";
     //temperory for quick access
-    system("imageoutput.ppm");
+    //system("imageoutput.ppm");
+
+
+    HuffmanTree tree;
+    tree.initializeStaticDeflateTree();
     return 0;
 }
