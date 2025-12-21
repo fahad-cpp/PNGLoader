@@ -51,14 +51,69 @@ void HuffmanTree::initializeStaticDeflateTree(){
         int dist = i - (24 + 144 + 8);
         symbols[i] = 144 + dist;
     }
+    //symbol to distance ranges map
+    symbolRangeMap[0] = {0,1};
+    symbolRangeMap[1] = {0,2};
+    symbolRangeMap[2] = {0,3};
+    symbolRangeMap[3] = {0,4};
+    symbolRangeMap[4] = {1,5};
+    symbolRangeMap[5] = {1,7};
+    symbolRangeMap[6] = {2,9};
+    symbolRangeMap[7] = {2,13};
+    symbolRangeMap[8] = {3,17};
+    symbolRangeMap[9] = {3,25};
+    symbolRangeMap[10] = {4,33};
+    symbolRangeMap[11] = {4,49};
+    symbolRangeMap[12] = {5,65};
+    symbolRangeMap[13] = {5,97};
+    symbolRangeMap[14] = {6,129};
+    symbolRangeMap[15] = {6,193};
+    symbolRangeMap[16] = {7,257};
+    symbolRangeMap[17] = {7,385};
+    symbolRangeMap[18] = {8,513};
+    symbolRangeMap[19] = {8,769};
+    symbolRangeMap[20] = {9,1025};
+    symbolRangeMap[21] = {9,1537};
+    symbolRangeMap[22] = {10,2049};
+    symbolRangeMap[23] = {10,3073};
+    symbolRangeMap[24] = {11,4097};
+    symbolRangeMap[25] = {11,6145};
+    symbolRangeMap[26] = {12,8193};
+    symbolRangeMap[27] = {12,12289};
+    symbolRangeMap[28] = {13,16385};
+    symbolRangeMap[29] = {13,24577};
 
-    for(int i=0;i<symbols.size();i++){
-        std::cout << "symbols["<<i<<"]: "<< symbols[i] << "\n";
-    }
+    //static huffman length codes
+    symbolRangeMap[257] = {0,3};
+    symbolRangeMap[258] = {0,4};
+    symbolRangeMap[259] = {0,5};
+    symbolRangeMap[260] = {0,6};
+    symbolRangeMap[261] = {0,7};
+    symbolRangeMap[262] = {0,8};
+    symbolRangeMap[263] = {0,9};
+    symbolRangeMap[264] = {0,10};
+    symbolRangeMap[265] = {1,11};
+    symbolRangeMap[266] = {1,13};
+    symbolRangeMap[267] = {1,15};
+    symbolRangeMap[268] = {1,17};
+    symbolRangeMap[269] = {2,19};
+    symbolRangeMap[270] = {2,23};
+    symbolRangeMap[271] = {2,27};
+    symbolRangeMap[272] = {2,31};
+    symbolRangeMap[273] = {3,35};
+    symbolRangeMap[274] = {3,43};
+    symbolRangeMap[275] = {3,51};
+    symbolRangeMap[276] = {3,59};
+    symbolRangeMap[277] = {4,67};
+    symbolRangeMap[278] = {4,83};
+    symbolRangeMap[279] = {4,99};
+    symbolRangeMap[280] = {4,115};
+    symbolRangeMap[281] = {5,131};
+    symbolRangeMap[282] = {5,163};
+    symbolRangeMap[283] = {5,195};
+    symbolRangeMap[284] = {5,227};
+    symbolRangeMap[285] = {0,258};
 
-    for(int i=0;i<first_symbol.size();i++){
-        std::cout << "first_symbol["<<i<<"]: " << first_symbol[i] << "\n";
-    }
 }
 
 void HuffmanTree::setMaxBit(u8 maxCount){

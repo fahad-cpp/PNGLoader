@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <math.h>
 #include "HuffmanTree.h"
+#include "BitReader.h"
 typedef unsigned int u32;
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -176,6 +177,18 @@ public:
 
         ofs.write((char *)(buffer.data()),buffer.size());
     }
+    u32 getLength(u32 firstValue,u32 symbol,u32 offset,u32 extraBitCount,u32 extraBits){
+        u32 length = 0;
+        u32 index = symbol - firstValue;
+        u32 maxNums = pow(2,extraBitCount);
+        std::vector<int> numbers(maxNums,0);
+        for(int i=1;i<=maxNums;i++){
+            numbers.push_back((offset + (index * 2) + i));
+        }
+        length = numbers[extraBits];
+
+        return length;
+    }
     bool decompressData(ParsedData& parsedData){
         //Block compression types
         enum BlockType{
@@ -191,41 +204,76 @@ public:
         std::cout << "Compressed data size: "<<parsedData.compressedData.size()<<" Bytes \n";
         
         std::vector<u8> staticHuffmanBuffer;
-        while((reader + 8) <= end){
+        BitReader bitReader((u8*)reader);
+        while((bitReader.reader + 8) <= (u8*)end){
             //Block header
-            char header = reader[0];
-            bool lastblockbit = (header & 1);// Header & 00000001
-            int compressionType = (header & 2) | ((header & 4) >> 2);
-            reader += 1;
+            bool lastblockbit = bitReader.read_bitLE();
+            int compressionType = bitReader.read_bitsLE(2);
+            //skip header
+            bitReader.skip(1);
             u16 blockLength = 0;
             if(compressionType == BTYPE_NO_COMPRESSION){
                 //Read LEN(2B)
-                blockLength = readBigEndian16(&reader[0]);
+                blockLength = bitReader.read_short();
                 std::cout<<"Block length : "<<blockLength<<"\n";
-                //skip LEN(2B) and NLEN(2B)
-                reader += 4;
-                parsedData.imageData.insert(parsedData.imageData.end(),(u8*)reader,(u8*)reader+blockLength);
+                //skip NLEN(2B)
+                bitReader.skip(2);
+                parsedData.imageData.insert(parsedData.imageData.end(),(u8*)bitReader.reader,(u8*)bitReader.reader+blockLength);
                 //skip data
-                reader += blockLength;
+                bitReader.skip(blockLength);
             }else if(compressionType == BTYPE_FIXED_HUFFMAN){
-                bool lastBlock = false;
-                // HuffmanTree tree;
-                // tree.initializeStaticDeflateTree();
-                // while(!lastBlock){
-                //     u32 code = 0;
-                //     for(int i=0;i<9;i++){
-                //         bit = read_bit(reader);
-                //         code = (code << 1) | bit;
+                std::cout <<"Deflate block : BTYPE_FIXED_HUFFMAN\n";
+                bool endOfBlock = false;
+                static HuffmanTree tree;
+                tree.initializeStaticDeflateTree();
+                while(!endOfBlock){
+                    u32 code = 0;
+                    u32 symbol = 0;
+                    for(int i=1;i<=9;i++){
+                        u32 bit = bitReader.read_bit();
+                        code = code | (bit << (i-1));
 
-                //         if(code >= tree.first_code[i] && code < (tree.first_code[i] + tree.codes[i])){
-                //             int index = tree.first_symbol[i] + (code - tree.first_code[i]);
-                //             u32 symbol = tree.symbols[index];
-                //             break;
-                //         }
-                //     }
-                // }
-                std::cout <<"Unhandled Deflate block:BTYPE_FIXED_HUFFMAN\n";
-                return false;
+                        //lookup code from tree
+                        if(code >= tree.first_code[i] && (code < (tree.first_code[i] + tree.codes[i]))){
+                            int index = tree.first_symbol[i] + (code - tree.first_code[i]);
+                            symbol = tree.symbols[index];
+                            //std::cout << "code found\n";
+                            break;
+                        }
+                    }
+                    if(symbol < 256){
+                        parsedData.imageData.push_back((u8)symbol);
+                    }
+                    else if(symbol == 256){
+                        endOfBlock = true;
+                    }else{
+                        //std::cout << "LZ77 pair\n";
+                        u32 length=0;
+                        if(symbol < 265){
+                            length = symbol - 254;
+                        }else if(symbol == 285){
+                            length = 258;
+                        }else if(symbol < 285){
+                            BitRange range = tree.symbolRangeMap[symbol];
+                            u32 extraBits = range.bitCount;
+                            u32 offset = bitReader.read_bitsNUM(extraBits);
+                            length = range.min + offset;
+                        }else{
+                            length = 0;
+                            std::cerr << "Invalid bit";
+                        }
+                        u32 distanceCode = bitReader.read_bits(5);
+                        BitRange range = tree.symbolRangeMap[distanceCode];
+                        u32 extraBits = range.bitCount;
+                        u32 offset = bitReader.read_bitsNUM(extraBits);
+                        u32 distance = range.min + offset;
+                    }
+
+                }
+                writeToFile("staticHuffmanBuffer.bin",parsedData.imageData);
+                std::cout << "Byte Offset : "<< bitReader.bytesPushed << "\n";
+                std::cout << "Bit Offset : "<< (int)bitReader.bitOffset << "\n";
+
             }else if(compressionType == BTYPE_DYNAMIC_HUFFMAN){
                 std::cout <<"Unhandled deflate block:BTYPE_DYNAMIC_HUFFMAN\n";
                 return false;
@@ -235,7 +283,7 @@ public:
             }
             if(lastblockbit)std::cout << "(Last Block)\n";
         }
-        writeToFile("staticHuffmanBuffer.bin",staticHuffmanBuffer);
+        
         return true;
     }
     
@@ -289,9 +337,13 @@ u32 paethPredictor(u8 a,u8 b,u8 c){
 }
 const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
     const u8* reader = buffer;
+    if(!(reader + (sizeof(u8)*width*height*3))){
+        std::cerr << "Invalid buffer provided\n";
+        return nullptr;
+    }
     u8* returnBuffer = (u8*)malloc(sizeof(u8)*(width*height*3));
     u8* writer = returnBuffer;
-    Pixel prevPixel;
+    Pixel prevPixel = {0,0,0};
     std::vector<Pixel> prevScanline(width,{0,0,0});
     //Per scanline
     for(u32 y=0;y<height;y++){
@@ -318,23 +370,22 @@ const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
         //Per Pixel
         for(u32 x=0;x<width;x++){
             Pixel curPixel = {0,0,0};
-            
             //Per channel
             for(u32 i=0;i<3;i++){
-                u8 value=0;
+                u8 value= reader?reader[i]:0;
                 u8 a = (x>0?prevPixel.getChannel(i):0);
                 u8 b = (y>0?prevScanline[x].getChannel(i):0);
                 u8 c = (x>0?prevScanline[x-1].getChannel(i):0);
                 if(filterType == 1){
-                    value = reader[i] + a;
+                    value = value + a;
                 }else if(filterType == 2){
-                    value = reader[i] + b;
+                    value = value + b;
                 }else if(filterType == 3){
-                    value = reader[i] + floor((a + b)/ 2.f);
+                    value = value + floor((a + b)/ 2.f);
                 }else if(filterType == 4){
-                    value = reader[i] + paethPredictor(a,b,c);
+                    value = value + paethPredictor(a,b,c);
                 }else{
-                    value = reader[i];
+                    value = value;
                 }
                 curPixel.setChannel(i,value);
                 writer[i] = curPixel.getChannel(i);
@@ -346,6 +397,7 @@ const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
         }
         prevScanline = currentScanline;
     }
+    std::cout << "Buffer filtered.\n";
     return returnBuffer;
 }
 void deleteBuffer(const u8* buffer){
@@ -390,29 +442,25 @@ int main(int argc,char* argv[]) {
     const std::string filepath = argc<2?"..\\res\\dbh.png":argv[1];
     Parser parser;
     ParsedData parsedData;
-    // if (parser.parse(filepath, parsedData)) {
-    //     std::cout<<"---PNG--info---\n";
-    //     std::cout << "IHDR:\n";
-    //     std::cout << "\tWidth: " << parsedData.width << "\n";
-    //     std::cout << "\tHeight: " << parsedData.height << "\n";
-    //     std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
-    //     std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
-    //     std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
-    //     std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
-    //     std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
-    //     std::cout << "IDAT:\n";
+    if (parser.parse(filepath, parsedData)) {
+        std::cout<<"---PNG--info---\n";
+        std::cout << "IHDR:\n";
+        std::cout << "\tWidth: " << parsedData.width << "\n";
+        std::cout << "\tHeight: " << parsedData.height << "\n";
+        std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
+        std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
+        std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
+        std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
+        std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
+        std::cout << "IDAT:\n";
 
-    //     std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
-    // }else{
-    //     return 1;
-    // }
-    // defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
-    // std::cout<<"Successfully parsed the png\n";
-    //temperory for quick access
-    //system("imageoutput.ppm");
-
-
-    HuffmanTree tree;
-    tree.initializeStaticDeflateTree();
+        std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
+    }else{
+        //return 1;
+    }
+    defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
+    std::cout<<"Successfully parsed the png\n";
+    // temperory for quick access
+    system("imageoutput.ppm");
     return 0;
 }
