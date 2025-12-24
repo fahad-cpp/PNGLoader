@@ -1,109 +1,63 @@
 #include "BitReader.h"
 #include <iostream>
-u32 BitReader::read_bit(){
-    u32 bit = *reader & (1 << (7-bitOffset));
-    bit = (bit >> (7-bitOffset));
+
+u32 BitReader::peekBits(u32 bitCount){
+    u32 code = 0;
+    for(int i=0;i<bitCount;i++){
+        u32 globalPos = bitOffset + i;
+        u32 byte = reader[globalPos / 8];
+        u32 bit = (byte >> (globalPos % 8)) & 1;
+        code = (code << 1) | bit;
+    }
+    return code;
+}
+
+u32 BitReader:: readBit(){
+    u32 bit = (*reader >> bitOffset) & 1;
     bitOffset++;
-    if(bitOffset > 7){
-        reader++;
-        bytesPushed++;
+    if(bitOffset == 8){
         bitOffset = 0;
-    }
-    return bit;
-}
-
-u32 BitReader::read_bitLE(){
-    u32 bit = *reader & (1 << (LEbitOffset));
-    bit = (bit >> (LEbitOffset));
-    LEbitOffset++;
-    if(LEbitOffset > 7){
         reader++;
         bytesPushed++;
-        LEbitOffset = 0;
     }
     return bit;
 }
 
-u32 BitReader::read_bits(u8 bitCount){
+u32 BitReader::readBits(u8 bitCount){
     if(bitCount > 32){
-        std::cerr << "bits can only be read upto 32 at a time\n";
-        return 0;
+        bitCount = 32;
     }
     u32 code = 0;
     for(u8 i=1;i<=bitCount;i++){
-        code = (code << 1) | read_bit();
+        code = (code << 1) | readBit();
     }
 
     return code;
 }
 
-u32 BitReader::read_bitsLE(u8 bitCount){
+u32 BitReader::readBitsREV(u8 bitCount){
     if(bitCount > 32){
-        std::cerr << "bits can only be read upto 32 at a time\n";
-        return 0;
-    }
-    u32 code = 0;
-    for(u8 i=1;i<=bitCount;i++){
-        code = (code << 1) | read_bitLE();
-    }
-
-    return code;
-}
-
-u32 BitReader::read_bitsLENUM(u8 bitCount){
-    if(bitCount > 32){
-        std::cerr << "bits can only be read upto 32 at a time\n";
-        return 0;
-    }
-    u32 code = 0;
-    for(u8 i=1;i<=bitCount;i++){
-        code = code | (read_bitLE() << i);
-    }
-
-    return code;
-}
-
-u32 BitReader::read_bitsNUM(u8 bitCount){
-    if(bitCount > 32){
-        std::cerr << "bits can only be read upto 32 at a time\n";
-        return 0;
+        bitCount = 32;
     }
     u32 code = 0;
     for(u8 i=0;i<bitCount;i++){
-        code = code | (read_bit() << i);
+        code = code | (readBit() << i);
     }
 
     return code;
 }
 
-u32 BitReader::read_byte(){
-    u32 byte = reader[0];
-    bitOffset = 0;
-    LEbitOffset = 0;
-    bytesPushed++;
-    reader++;
-
-    return byte;
-}
-
-u32 BitReader::read_short(){
-    u32 ret = (static_cast<unsigned char>(reader[0])) |
-        (static_cast<unsigned char>(reader[1]) << 8);
-
-    reader += 2;
-    bytesPushed += 2;
-    bitOffset = 0;
-    LEbitOffset = 0;
-    return ret;
-}
-
-void BitReader::skip(u32 amount){
+void BitReader::skipCurByte(u32 amount){
     reader += amount;
     bytesPushed += amount;
     bitOffset = 0;
-    LEbitOffset = 0;
 }
 
-void BitReader::skipBitLE(u32 amount){
-    LEbitOffset++;
+void BitReader::skipBit(){
+    bitOffset++;
+    if(bitOffset == 8){
+        bitOffset = 0;
+        bytesPushed++;
+        reader++;
+    }
 }

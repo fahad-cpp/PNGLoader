@@ -5,24 +5,20 @@ typedef unsigned char u8;
 class BitReader{
     public:
     u8 bitOffset;
-    u8 LEbitOffset;
     u32 bytesPushed;
     u8* reader;
     BitReader(u8* _reader)
-    :reader(_reader),bitOffset(0),bytesPushed(0),LEbitOffset(0)
+    :reader(_reader),bitOffset(0),bytesPushed(0)
     {
 
     };
-
-    u32 read_bit();
-    u32 read_bitLE();
-    u32 read_byte();
-    u32 read_bits(u8 bitCount);
-    u32 read_bitsLE(u8 bitCount);
-    u32 read_bitsNUM(u8 bitCount);
-    u32 read_bitsLENUM(u8 bitCount);
-    u32 read_short();
-    void skip(u32 amount);
-    void skipBitLE(u32 amount);
+    u32 readBit();
+    u32 peekBits(u32 bitCount);
+    u32 readByte();
+    u32 readBits(u8 bitCount);
+    u32 readBitsREV(u8 bitCount);
+    u32 readShort();
+    void skipBit();
+    void skipCurByte(u32 amount);
 };
 #endif

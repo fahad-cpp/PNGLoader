@@ -224,20 +224,20 @@ public:
         BitReader bitReader((u8*)reader);
         while((bitReader.reader + 8) <= (u8*)end){
             //Block header
-            bool lastblockbit = bitReader.read_bitLE();
-            int compressionType = bitReader.read_bitsLE(2);
+            bool lastblockbit = bitReader.readBit();
+            int compressionType = bitReader.readBits(2);
             u16 blockLength = 0;
             if(compressionType == BTYPE_NO_COMPRESSION){
                 //skip header
-                bitReader.skip(1);
+                bitReader.skipCurByte(1);
                 //Read LEN(2B)
-                blockLength = bitReader.read_short();
+                blockLength = bitReader.readBitsREV(16);
                 std::cout<<"Block length : "<<blockLength<<"\n";
                 //skip NLEN(2B)
-                bitReader.skip(2);
+                bitReader.skipCurByte(2);
                 parsedData.imageData.insert(parsedData.imageData.end(),(u8*)bitReader.reader,(u8*)bitReader.reader+blockLength);
                 //skip data
-                bitReader.skip(blockLength);
+                bitReader.skipCurByte(blockLength);
             }else if(compressionType == BTYPE_FIXED_HUFFMAN){
                 std::cout <<"Deflate block : BTYPE_FIXED_HUFFMAN\n";
                 bool endOfBlock = false;
@@ -247,8 +247,8 @@ public:
                     u32 code = 0;
                     u32 symbol = 0;
                     for(int i=1;i<=9;i++){
-                        code = code | (bitReader.read_bitLE() << (i-1));
-                        //code = (code << 1) | bitReader.read_bitLE();
+                        //code = code | (bitReader.readBit() << (i-1));
+                        code = (code << 1) | bitReader.readBit();
 
                         //lookup code from tree
                         if((code >= tree.first_code[i]) && (code < (tree.first_code[i] + tree.codes[i]))){
@@ -280,17 +280,17 @@ public:
                         }else if(symbol < 285){
                             BitRange range = tree.symbolRangeMap[symbol];
                             u32 extraBits = range.bitCount;
-                            u32 offset = bitReader.read_bitsLE(extraBits);
+                            u32 offset = bitReader.readBits(extraBits);
                             length = range.min + offset;
                         }else{
                             length = 0;
                             std::cerr << "Invalid bit";
                         }
                         
-                        u32 distanceCode = bitReader.read_bitsLE(5);
+                        u32 distanceCode = bitReader.readBits(5);
                         BitRange range = tree.symbolRangeMap[distanceCode];
                         u32 extraBits = range.bitCount;
-                        u32 offset = extraBits?bitReader.read_bitsLE(extraBits):0;
+                        u32 offset = extraBits?bitReader.readBits(extraBits):0;
                         u32 distance = range.min + offset;
                         std::cout << "Distance Symbol : " << distanceCode << "\n";
                         std::cout << "pair: <" << length << ',' << distance << ">\n";
@@ -299,7 +299,7 @@ public:
                 }
                 writeToFile("staticHuffmanBuffer.bin",parsedData.imageData);
                 std::cout << "Byte Offset : "<< bitReader.bytesPushed << "\n";
-                std::cout << "Bit Offset : "<< (int)bitReader.LEbitOffset << "\n";
+                std::cout << "Bit Offset : "<< (int)bitReader.bitOffset << "\n";
 
             }else if(compressionType == BTYPE_DYNAMIC_HUFFMAN){
                 std::cout <<"Unhandled deflate block:BTYPE_DYNAMIC_HUFFMAN\n";
@@ -466,7 +466,7 @@ int main(int argc,char* argv[]) {
         //return 1;
     //}
 
-    const std::string filepath = argc<2?"..\\res\\dbh.png":argv[1];
+    const std::string filepath = argc<2?"res/test.png":argv[1];
     Parser parser;
     ParsedData parsedData;
     if (parser.parse(filepath, parsedData)) {
@@ -488,6 +488,6 @@ int main(int argc,char* argv[]) {
     defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
     std::cout<<"Successfully parsed the png\n";
     // temperory for quick access
-    system("imageoutput.ppm");
+    system("./imageoutput.ppm");
     return 0;
 }

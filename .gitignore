@@ -7,3 +7,4 @@ bin/*
 build/*
 references/*
 build.bat
+build.sh
