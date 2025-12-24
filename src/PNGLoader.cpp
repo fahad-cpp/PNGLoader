@@ -167,6 +167,23 @@ public:
         }
         return result;
     }
+    std::string bitsAsBin(u32 bits){
+        char bytes[4];
+        bytes[0] = (static_cast<u8>(bits >> 24));
+        bytes[1] = (static_cast<u8>(bits >> 16));
+        bytes[2] = (static_cast<u8>(bits >> 8));
+        bytes[3] = (static_cast<u8>(bits));
+
+        std::string res[4];
+        res[0] = byteAsBin(bytes[0]);
+        res[1] = byteAsBin(bytes[1]);
+        res[2] = byteAsBin(bytes[2]);
+        res[3] = byteAsBin(bytes[3]);
+
+        std::string result = res[0] + ' ' + res[1] + ' ' + res[2] + ' ' + res[3];
+
+        return result;
+    }
     void writeToFile(std::string filename,std::vector<u8> buffer){
         std::ofstream ofs;
         ofs.open(filename);
@@ -209,10 +226,10 @@ public:
             //Block header
             bool lastblockbit = bitReader.read_bitLE();
             int compressionType = bitReader.read_bitsLE(2);
-            //skip header
-            bitReader.skip(1);
             u16 blockLength = 0;
             if(compressionType == BTYPE_NO_COMPRESSION){
+                //skip header
+                bitReader.skip(1);
                 //Read LEN(2B)
                 blockLength = bitReader.read_short();
                 std::cout<<"Block length : "<<blockLength<<"\n";
@@ -230,24 +247,31 @@ public:
                     u32 code = 0;
                     u32 symbol = 0;
                     for(int i=1;i<=9;i++){
-                        u32 bit = bitReader.read_bit();
-                        code = code | (bit << (i-1));
+                        code = code | (bitReader.read_bitLE() << (i-1));
+                        //code = (code << 1) | bitReader.read_bitLE();
 
                         //lookup code from tree
-                        if(code >= tree.first_code[i] && (code < (tree.first_code[i] + tree.codes[i]))){
-                            int index = tree.first_symbol[i] + (code - tree.first_code[i]);
+                        if((code >= tree.first_code[i]) && (code < (tree.first_code[i] + tree.codes[i]))){
+                            u32 index = tree.first_symbol[i] + (code - tree.first_code[i]);
                             symbol = tree.symbols[index];
-                            //std::cout << "code found\n";
                             break;
+                        }
+
+                        if(i==9){
+                            std::cout << bitsAsBin(code);
+                            std::cout << " WTF\n";
                         }
                     }
                     if(symbol < 256){
+                        std::cout << "code: " << bitsAsBin(code) << "\n";
+                        std::cout << "literal: "<<(int)symbol<<"\n";
                         parsedData.imageData.push_back((u8)symbol);
                     }
                     else if(symbol == 256){
                         endOfBlock = true;
                     }else{
                         //std::cout << "LZ77 pair\n";
+                        std::cout << "Length Symbol : " << symbol << "\n";
                         u32 length=0;
                         if(symbol < 265){
                             length = symbol - 254;
@@ -256,23 +280,26 @@ public:
                         }else if(symbol < 285){
                             BitRange range = tree.symbolRangeMap[symbol];
                             u32 extraBits = range.bitCount;
-                            u32 offset = bitReader.read_bitsNUM(extraBits);
+                            u32 offset = bitReader.read_bitsLE(extraBits);
                             length = range.min + offset;
                         }else{
                             length = 0;
                             std::cerr << "Invalid bit";
                         }
-                        u32 distanceCode = bitReader.read_bits(5);
+                        
+                        u32 distanceCode = bitReader.read_bitsLE(5);
                         BitRange range = tree.symbolRangeMap[distanceCode];
                         u32 extraBits = range.bitCount;
-                        u32 offset = bitReader.read_bitsNUM(extraBits);
+                        u32 offset = extraBits?bitReader.read_bitsLE(extraBits):0;
                         u32 distance = range.min + offset;
+                        std::cout << "Distance Symbol : " << distanceCode << "\n";
+                        std::cout << "pair: <" << length << ',' << distance << ">\n";
                     }
 
                 }
                 writeToFile("staticHuffmanBuffer.bin",parsedData.imageData);
                 std::cout << "Byte Offset : "<< bitReader.bytesPushed << "\n";
-                std::cout << "Bit Offset : "<< (int)bitReader.bitOffset << "\n";
+                std::cout << "Bit Offset : "<< (int)bitReader.LEbitOffset << "\n";
 
             }else if(compressionType == BTYPE_DYNAMIC_HUFFMAN){
                 std::cout <<"Unhandled deflate block:BTYPE_DYNAMIC_HUFFMAN\n";

@@ -20,7 +20,9 @@ class BitReader{
     u32 read_bits(u8 bitCount);
     u32 read_bitsLE(u8 bitCount);
     u32 read_bitsNUM(u8 bitCount);
+    u32 read_bitsLENUM(u8 bitCount);
     u32 read_short();
     void skip(u32 amount);
+    void skipBitLE(u32 amount);
 };
 #endif

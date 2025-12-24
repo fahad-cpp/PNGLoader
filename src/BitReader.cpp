@@ -50,6 +50,19 @@ u32 BitReader::read_bitsLE(u8 bitCount){
     return code;
 }
 
+u32 BitReader::read_bitsLENUM(u8 bitCount){
+    if(bitCount > 32){
+        std::cerr << "bits can only be read upto 32 at a time\n";
+        return 0;
+    }
+    u32 code = 0;
+    for(u8 i=1;i<=bitCount;i++){
+        code = code | (read_bitLE() << i);
+    }
+
+    return code;
+}
+
 u32 BitReader::read_bitsNUM(u8 bitCount){
     if(bitCount > 32){
         std::cerr << "bits can only be read upto 32 at a time\n";
@@ -89,4 +102,8 @@ void BitReader::skip(u32 amount){
     bytesPushed += amount;
     bitOffset = 0;
     LEbitOffset = 0;
+}
+
+void BitReader::skipBitLE(u32 amount){
+    LEbitOffset++;
 }

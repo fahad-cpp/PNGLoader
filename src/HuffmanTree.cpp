@@ -22,11 +22,14 @@ void HuffmanTree::initializeStaticDeflateTree(){
     codes[7] = 24;
     codes[8] = 144 + 8;
     codes[9] = 112;
+
+
     u32 code = 0;
     for(u8 i=1;i<=maxBit;i++){
         code = (code + codes[i-1]) << 1;
         first_code[i] = code;
     }
+    
     //7-bit symbols
     first_symbol[7] = 0;
     for(size_t i=0;i<24;i++){
