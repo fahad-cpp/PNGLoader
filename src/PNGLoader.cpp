@@ -7,9 +7,11 @@
 #include <math.h>
 #include "HuffmanTree.h"
 #include "BitReader.h"
+
 typedef unsigned int u32;
 typedef unsigned char u8;
 typedef unsigned short u16;
+
 struct Pixel{
     u8 R;
     u8 G;
@@ -35,6 +37,7 @@ struct Pixel{
         }
     }
 };
+
 struct ParsedData{
     u32 width;
     u32 height;
@@ -46,6 +49,7 @@ struct ParsedData{
     std::vector<char> compressedData;
     std::vector<u8> imageData;
 };
+
 char colorTypes[7][20] = {
     "Grayscale",            // 0
     "ERROR",
@@ -60,6 +64,7 @@ char compressionNames[3][16] = {
     "Fixed Huffman",
     "Dynamic Huffman"
 };
+
 class Parser {
 public:
     ~Parser() = default;
@@ -159,6 +164,7 @@ public:
         
         return result;
     }
+
     std::string byteAsBin(char value){
         std::string result = "";
         for (int i=7;i>-1;i--){
@@ -167,6 +173,7 @@ public:
         }
         return result;
     }
+
     std::string bitsAsBin(u32 bits){
         char bytes[4];
         bytes[0] = (static_cast<u8>(bits >> 24));
@@ -184,28 +191,7 @@ public:
 
         return result;
     }
-    void writeToFile(std::string filename,std::vector<u8> buffer){
-        std::ofstream ofs;
-        ofs.open(filename);
-        if(!ofs.is_open()){
-            std::cerr << "Failed to open " << filename << "\n";
-            return;
-        }
 
-        ofs.write((char *)(buffer.data()),buffer.size());
-    }
-    u32 getLength(u32 firstValue,u32 symbol,u32 offset,u32 extraBitCount,u32 extraBits){
-        u32 length = 0;
-        u32 index = symbol - firstValue;
-        u32 maxNums = pow(2,extraBitCount);
-        std::vector<int> numbers(maxNums,0);
-        for(int i=1;i<=maxNums;i++){
-            numbers.push_back((offset + (index * 2) + i));
-        }
-        length = numbers[extraBits];
-
-        return length;
-    }
     bool decompressData(ParsedData& parsedData){
         //Block compression types
         enum BlockType{
@@ -216,62 +202,75 @@ public:
         };
         const char* reader = parsedData.compressedData.data();
         const char* end = parsedData.compressedData.data() + parsedData.compressedData.size();
-        //skip zlib header (CMF and FLG)
-        reader += 2;
+        //skip zlib header CMF
+        reader += 1;
+
+        bool DICTexists = ((*reader & 32) != 0); //*reader & 00100000
+        //Skip FLG
+        reader += 1;
+        if(DICTexists){
+            //skip DICT ADLER32
+            reader += 4;
+        }
         std::cout << "Compressed data size: "<<parsedData.compressedData.size()<<" Bytes \n";
         
-        std::vector<u8> staticHuffmanBuffer;
         BitReader bitReader((u8*)reader);
         while((bitReader.reader + 8) <= (u8*)end){
             //Block header
             bool lastblockbit = bitReader.readBit();
-            int compressionType = bitReader.readBits(2);
+            u32 compressionType = bitReader.readBitsLE(2);
             u16 blockLength = 0;
             if(compressionType == BTYPE_NO_COMPRESSION){
+                std::cout <<"Deflate block : BTYPE_NO_COMPRESSION\n";
                 //skip header
                 bitReader.skipCurByte(1);
                 //Read LEN(2B)
-                blockLength = bitReader.readBitsREV(16);
+                blockLength = bitReader.readBitsLE(16);
                 std::cout<<"Block length : "<<blockLength<<"\n";
-                //skip NLEN(2B)
-                bitReader.skipCurByte(2);
+                //Read NLEN(2B)
+                u16 nlen = bitReader.readBitsLE(16);
+                //check validity
+                if(u16((blockLength | nlen) + 1u) != 0){
+                    std::cerr << "LEN NLEN do not match\n";
+                    std::cerr << "PNG file is corrupt\n";
+                    return false;
+                }
                 parsedData.imageData.insert(parsedData.imageData.end(),(u8*)bitReader.reader,(u8*)bitReader.reader+blockLength);
                 //skip data
                 bitReader.skipCurByte(blockLength);
             }else if(compressionType == BTYPE_FIXED_HUFFMAN){
                 std::cout <<"Deflate block : BTYPE_FIXED_HUFFMAN\n";
-                bool endOfBlock = false;
                 static HuffmanTree tree;
+                bool endOfBlock = false;
                 tree.initializeStaticDeflateTree();
                 while(!endOfBlock){
-                    u32 code = 0;
                     u32 symbol = 0;
-                    for(int i=1;i<=9;i++){
-                        //code = code | (bitReader.readBit() << (i-1));
-                        code = (code << 1) | bitReader.readBit();
-
+                    u32 code = 0;
+                    for(int i=7;i<=9;i++){
+                        code = bitReader.peekBits(i);
+                        
                         //lookup code from tree
                         if((code >= tree.first_code[i]) && (code < (tree.first_code[i] + tree.codes[i]))){
                             u32 index = tree.first_symbol[i] + (code - tree.first_code[i]);
                             symbol = tree.symbols[index];
+                            bitReader.skipBits(i);
                             break;
                         }
 
                         if(i==9){
                             std::cout << bitsAsBin(code);
-                            std::cout << " WTF\n";
+                            std::cout << "No codes matched the tree (THIS SHOULD NOT HAPPEN)\n";
+                            return false;
                         }
                     }
                     if(symbol < 256){
-                        std::cout << "code: " << bitsAsBin(code) << "\n";
-                        std::cout << "literal: "<<(int)symbol<<"\n";
+                        //std::cout << "code: " << bitsAsBin(code) << "\n";
+                        std::cout << "literal: "<<symbol<<"\n";
                         parsedData.imageData.push_back((u8)symbol);
                     }
                     else if(symbol == 256){
                         endOfBlock = true;
                     }else{
-                        //std::cout << "LZ77 pair\n";
-                        std::cout << "Length Symbol : " << symbol << "\n";
                         u32 length=0;
                         if(symbol < 265){
                             length = symbol - 254;
@@ -280,29 +279,55 @@ public:
                         }else if(symbol < 285){
                             BitRange range = tree.symbolRangeMap[symbol];
                             u32 extraBits = range.bitCount;
-                            u32 offset = bitReader.readBits(extraBits);
+                            u32 offset = bitReader.readBitsLE(extraBits);
                             length = range.min + offset;
                         }else{
                             length = 0;
-                            std::cerr << "Invalid bit";
+                            std::cerr << "Invalid bit\n";
+                            return false;
                         }
                         
                         u32 distanceCode = bitReader.readBits(5);
+                        if(distanceCode > 29){
+                            //std::cerr << "Code: "<< code <<"\n";
+                            std::cerr << "Invalid distance code: "<<distanceCode<<"\n";
+                            return false;
+                        }
                         BitRange range = tree.symbolRangeMap[distanceCode];
                         u32 extraBits = range.bitCount;
-                        u32 offset = extraBits?bitReader.readBits(extraBits):0;
+                        u32 offset = extraBits?bitReader.readBitsLE(extraBits):0;
                         u32 distance = range.min + offset;
-                        std::cout << "Distance Symbol : " << distanceCode << "\n";
+                        if(length > distance){
+                            std::cerr << "Invalid Length: "<<length<<" (Length cant be more than distance)\n";
+                            return false;
+                        }
                         std::cout << "pair: <" << length << ',' << distance << ">\n";
+                        for(int i=0;i<length;i++){
+                            parsedData.imageData.push_back((0u));
+                        }
                     }
 
                 }
-                writeToFile("staticHuffmanBuffer.bin",parsedData.imageData);
                 std::cout << "Byte Offset : "<< bitReader.bytesPushed << "\n";
                 std::cout << "Bit Offset : "<< (int)bitReader.bitOffset << "\n";
 
             }else if(compressionType == BTYPE_DYNAMIC_HUFFMAN){
-                std::cout <<"Unhandled deflate block:BTYPE_DYNAMIC_HUFFMAN\n";
+                std::cout <<"Unhandled Deflate block:BTYPE_DYNAMIC_HUFFMAN\n";
+                u32 hLit = bitReader.readBitsLE(5);
+                u32 hDist = bitReader.readBitsLE(5);
+                u32 hClen = bitReader.readBitsLE(4);
+                //Code Length's Lengths
+                u32 cll[19] = {0};
+                for(u32 i=0;i<(hClen+4);i++){
+                    cll[i] = bitReader.readBitsLE(3);
+                }
+                HuffmanTree clTree;
+
+                clTree.setCodeLengths(cll,19);
+
+                std::cout << "HLIT: "<<hLit<<"\n";
+                std::cout << "HDIST: "<<hDist<<"\n";
+                std::cout << "HCLEN: "<<hClen<<"\n";
                 return false;
             }else{
                 std::cout << "ERROR : INVALID COMPRESSION TYPE\n";
@@ -338,18 +363,7 @@ public:
         (static_cast<unsigned char>(data[1]) << 8);
     }
 };
-void exportData(const u8* data,u32 size){
-    std::ofstream ofs;
-    ofs.open("exportedData",std::ios::binary);
 
-    if(!ofs.is_open()){
-        std::cout << "Failed to open compressedrawdata\n";
-        return;
-    }else{
-        ofs.write((char*)data,size);
-    }
-    ofs.close();
-}
 u32 paethPredictor(u8 a,u8 b,u8 c){
     u32 pr = 0;
     int p = a + b - c;
@@ -362,6 +376,7 @@ u32 paethPredictor(u8 a,u8 b,u8 c){
 
     return pr;
 }
+
 const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
     const u8* reader = buffer;
     if(!(reader + (sizeof(u8)*width*height*3))){
@@ -424,12 +439,14 @@ const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
         }
         prevScanline = currentScanline;
     }
-    std::cout << "Buffer filtered.\n";
+    //std::cout << "Buffer filtered.\n";
     return returnBuffer;
 }
+
 void deleteBuffer(const u8* buffer){
     free((void*)buffer);
 }
+
 void defilterAndOutput(const u8* buffer,u32 width,u32 height){
     //Get Defiltered Buffer
     const u8* rgbBuffer = createDefilteredBuffer(buffer,width,height);
@@ -461,33 +478,29 @@ void defilterAndOutput(const u8* buffer,u32 width,u32 height){
 }
 
 int main(int argc,char* argv[]) {
-    //if(argc < 2){
-        //std::cout << "Usage: PNGLoader.exe <filename>\n";
-        //return 1;
-    //}
 
     const std::string filepath = argc<2?"res/test.png":argv[1];
     Parser parser;
     ParsedData parsedData;
     if (parser.parse(filepath, parsedData)) {
-        std::cout<<"---PNG--info---\n";
-        std::cout << "IHDR:\n";
-        std::cout << "\tWidth: " << parsedData.width << "\n";
-        std::cout << "\tHeight: " << parsedData.height << "\n";
-        std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
-        std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
-        std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
-        std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
-        std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
-        std::cout << "IDAT:\n";
+        // std::cout<<"---PNG--info---\n";
+        // std::cout << "IHDR:\n";
+        // std::cout << "\tWidth: " << parsedData.width << "\n";
+        // std::cout << "\tHeight: " << parsedData.height << "\n";
+        // std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
+        // std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
+        // std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
+        // std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
+        // std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
+        // std::cout << "IDAT:\n";
 
-        std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
+        // std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
     }else{
-        //return 1;
+        return 1;
     }
     defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
-    std::cout<<"Successfully parsed the png\n";
-    // temperory for quick access
-    system("./imageoutput.ppm");
+    //std::cout<<"Successfully parsed the png\n";
+    //temperory for quick access
+    system("start imageoutput.ppm");
     return 0;
 }

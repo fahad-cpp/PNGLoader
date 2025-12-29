@@ -10,12 +10,13 @@ ihdr_chunk = struct.pack(">I", 13) + b"IHDR" + ihdr_data
 ihdr_crc = struct.pack(">I", binascii.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF)
 ihdr_full = ihdr_chunk + ihdr_crc
 
-# Image data (solid blue RGB #0000FF, filter 0)
+# Image data (filter 0, solid blue)
 row = b'\x00' + b'\x00\x00\xff' * width
 scanlines = row * height
 
-# Compress (level=1 often fixed Huffman)
-compressed = zlib.compress(scanlines, level=1)
+# Fixed Huffman: raw DEFLATE
+compobj = zlib.compressobj(level=9,strategy=zlib.Z_HUFFMAN_ONLY, wbits=-15)
+compressed = compobj.compress(scanlines) + compobj.flush(zlib.Z_FINISH)
 
 # IDAT
 idat_chunk = struct.pack(">I", len(compressed)) + b"IDAT" + compressed

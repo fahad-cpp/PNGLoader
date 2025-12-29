@@ -1,4 +1,5 @@
 #include "HuffmanTree.h"
+#include <math.h>
 #include <iostream>
 void HuffmanTree::initializeStaticDeflateTree(){
     /*
@@ -124,4 +125,25 @@ void HuffmanTree::setMaxBit(u8 maxCount){
     codes.resize(maxCount+1,0);
     first_code.resize(maxCount+1,0);
     first_symbol.resize(maxCount+1,0);
+}
+
+//Kraft-McMillan's Inequality
+bool HuffmanTree::getKMI(u32 cLen[],u32 cLenSize){
+    u32 ie=0;
+    for(int i=0;i<cLenSize;i++){
+        ie += pow(2,-cLen[i]);
+    }
+    if(ie<=1)return true;
+    else return false;
+}
+
+void HuffmanTree::setCodeLengths(u32 cLen[],u32 cLenSize){
+    bool kraftMcMillanIe = getKMI(cLen,cLenSize);
+    
+    if(!kraftMcMillanIe){
+        std::cerr << "Invalid code Lengths (KMI not met)\n";
+        return;
+    }
+
+    //TODO(Generate codes)
 }
