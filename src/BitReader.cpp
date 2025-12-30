@@ -47,12 +47,6 @@ u32 BitReader::peekBits(u32 bitCount){
     return code;
 }
 
-void BitReader::skipCurByte(u32 amount){
-    reader += amount;
-    bytesPushed += amount;
-    bitOffset = 0;
-}
-
 void BitReader::skipBit(){
     bitOffset++;
     if(bitOffset == 8){
@@ -68,4 +62,10 @@ void BitReader::skipBits(u32 bitCount){
     bitOffset = bitOffset % 8;
     reader += bytesToSkip;
     bytesPushed += bytesToSkip;
+}
+
+void BitReader::skipCurByte(u32 amount){
+    reader += amount;
+    bytesPushed += amount;
+    bitOffset = 0;
 }

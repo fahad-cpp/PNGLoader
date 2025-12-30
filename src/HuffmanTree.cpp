@@ -1,6 +1,7 @@
 #include "HuffmanTree.h"
 #include <math.h>
 #include <iostream>
+#include <algorithm>
 void HuffmanTree::initializeStaticDeflateTree(){
     /*
         Lit Value   Bits    Codes
@@ -20,25 +21,25 @@ void HuffmanTree::initializeStaticDeflateTree(){
     symbols.resize(288);
     setMaxBit(9);
 
-    codes[7] = 24;
-    codes[8] = 144 + 8;
-    codes[9] = 112;
+    ncodes[7] = 24;
+    ncodes[8] = 144 + 8;
+    ncodes[9] = 112;
 
 
     u32 code = 0;
     for(u8 i=1;i<=maxBit;i++){
-        code = (code + codes[i-1]) << 1;
-        first_code[i] = code;
+        code = (code + ncodes.at(i-1)) << 1;
+        firstCode[i] = code;
     }
     
     //7-bit symbols
-    first_symbol[7] = 0;
+    firstSymbol[7] = 0;
     for(size_t i=0;i<24;i++){
         symbols[i] = 256 + i;
     }
 
     //8-bit symbols
-    first_symbol[8] = 24;
+    firstSymbol[8] = 24;
     for(size_t i=24;i<(24 + 144);i++){
         int dist = i - 24;
         symbols[i] = 0 + dist;
@@ -50,7 +51,7 @@ void HuffmanTree::initializeStaticDeflateTree(){
     }
 
     //9-bit symbols
-    first_symbol[9] = (24 + 144 + 8);
+    firstSymbol[9] = (24 + 144 + 8);
     for(size_t i = (24 + 144 + 8); i < (24 + 144 + 8 + 112); i++){
         int dist = i - (24 + 144 + 8);
         symbols[i] = 144 + dist;
@@ -122,28 +123,81 @@ void HuffmanTree::initializeStaticDeflateTree(){
 
 void HuffmanTree::setMaxBit(u8 maxCount){
     maxBit = maxCount;
-    codes.resize(maxCount+1,0);
-    first_code.resize(maxCount+1,0);
-    first_symbol.resize(maxCount+1,0);
+    ncodes.resize(maxCount+1,0);
+    firstCode.resize(maxCount+1,0);
+    firstSymbol.resize(maxCount+1,0);
 }
 
 //Kraft-McMillan's Inequality
 bool HuffmanTree::getKMI(u32 cLen[],u32 cLenSize){
     u32 ie=0;
     for(int i=0;i<cLenSize;i++){
+        if(cLen[i] == 0)continue;
         ie += pow(2,-cLen[i]);
     }
     if(ie<=1)return true;
     else return false;
 }
 
-void HuffmanTree::setCodeLengths(u32 cLen[],u32 cLenSize){
+void HuffmanTree::setCodeLengths(u32 psymbols[],u32 cLen[],u32 cLenSize){
+
     bool kraftMcMillanIe = getKMI(cLen,cLenSize);
     
     if(!kraftMcMillanIe){
         std::cerr << "Invalid code Lengths (KMI not met)\n";
         return;
     }
+    std::vector<std::pair<u32,u32>> symbolCLMap;
+    for(u32 i=0;i<19;i++){
+        symbolCLMap.push_back(std::pair<u32,u32>{psymbols[i],cLen[i]});
+    }
+    //sort lexicographically
+    std::sort(symbolCLMap.begin(),symbolCLMap.end());
+    //sort by code length
+    std::sort(symbolCLMap.begin(),symbolCLMap.end(),
+        [](const std::pair<int, int>& a,const std::pair<int, int>& b) {
+            return a.second < b.second;
+        }
+    );
 
-    //TODO(Generate codes)
+    //remove elements with 0 code length;
+    int firstIndex = 0;
+    while(symbolCLMap[firstIndex].second == 0)firstIndex++;
+    symbolCLMap.erase(symbolCLMap.begin(),symbolCLMap.begin()+firstIndex);
+
+    // for(const std::pair<u32,u32>& pair : symbolCLMap){
+    //     std::cout << "symbol: " << pair.first << " CL: " << pair.second << "\n";
+    // }
+
+    std::vector<u32> vsymbols;
+    std::vector<u32> vcodes;
+    vsymbols.reserve(symbolCLMap.size());
+    vcodes.reserve(symbolCLMap.size());
+
+    for(const std::pair<u32,u32>& pair : symbolCLMap){
+        vsymbols.push_back(pair.first);
+        vcodes.push_back(pair.second);
+    }
+
+    u32 maxBit = vcodes.at(vcodes.size()-1);
+    setMaxBit(maxBit);
+
+    //Generate codes
+    u32 code = 0;
+    int fsi = 0;
+    for(u32 i = vcodes.at(0);i<=maxBit;i++){
+        ncodes.at(i) = std::count(vcodes.begin(),vcodes.end(),i);
+        code = (code + ncodes.at(i-1)) << 1;
+        fsi += ncodes.at(i-1);
+        firstCode.at(i) = code;
+        firstSymbol.at(i) = fsi;
+    }
+
+    // std::cout << "---Tree---\n";
+    // for(int i=vcodes.at(0);i<=maxBit;i++){
+    //     std::cout << "bitlength: "<<i<<":\n";
+    //     std::cout << "firstCode: "<<firstCode.at(i)<<"\n";
+    //     std::cout << "firstSymbol: "<<firstSymbol.at(i)<<"\n";
+    //     std::cout << "ncodes: "<<ncodes.at(i)<<"\n\n";
+    // }
 }

@@ -13,11 +13,9 @@ class BitReader{
 
     };
     u32 readBit();
-    u32 readByte();
-    u32 peekBits(u32 bitCount);
     u32 readBits(u8 bitCount);
     u32 readBitsLE(u8 bitCount);
-    u32 readShort();
+    u32 peekBits(u32 bitCount);
     void skipBit();
     void skipBits(u32 bitCount);
     void skipCurByte(u32 amount);

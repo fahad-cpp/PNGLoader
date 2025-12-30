@@ -250,8 +250,8 @@ public:
                         code = bitReader.peekBits(i);
                         
                         //lookup code from tree
-                        if((code >= tree.first_code[i]) && (code < (tree.first_code[i] + tree.codes[i]))){
-                            u32 index = tree.first_symbol[i] + (code - tree.first_code[i]);
+                        if((code >= tree.firstCode[i]) && (code < (tree.firstCode[i] + tree.ncodes[i]))){
+                            u32 index = tree.firstSymbol[i] + (code - tree.firstCode[i]);
                             symbol = tree.symbols[index];
                             bitReader.skipBits(i);
                             break;
@@ -316,14 +316,15 @@ public:
                 u32 hLit = bitReader.readBitsLE(5);
                 u32 hDist = bitReader.readBitsLE(5);
                 u32 hClen = bitReader.readBitsLE(4);
+                
                 //Code Length's Lengths
                 u32 cll[19] = {0};
                 for(u32 i=0;i<(hClen+4);i++){
                     cll[i] = bitReader.readBitsLE(3);
                 }
                 HuffmanTree clTree;
-
-                clTree.setCodeLengths(cll,19);
+                u32 symbols[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
+                clTree.setCodeLengths(symbols,cll,19);
 
                 std::cout << "HLIT: "<<hLit<<"\n";
                 std::cout << "HDIST: "<<hDist<<"\n";
