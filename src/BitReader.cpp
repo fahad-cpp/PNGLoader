@@ -36,7 +36,7 @@ u32 BitReader::readBitsLE(u8 bitCount){
     
     return code;
 }
-u32 BitReader::peekBits(u32 bitCount){
+u32 BitReader::peekBits(u32 bitCount) const{
     u32 code = 0;
     for(int i=0;i<bitCount;i++){
         u32 globalPos = bitOffset + i;

@@ -313,18 +313,58 @@ public:
 
             }else if(compressionType == BTYPE_DYNAMIC_HUFFMAN){
                 std::cout <<"Unhandled Deflate block:BTYPE_DYNAMIC_HUFFMAN\n";
-                u32 hLit = bitReader.readBitsLE(5);
+                u32 hLit = bitReader.readBitsLE(5) ;
                 u32 hDist = bitReader.readBitsLE(5);
                 u32 hClen = bitReader.readBitsLE(4);
                 
                 //Code Length's Lengths
                 u32 cll[19] = {0};
-                for(u32 i=0;i<(hClen+4);i++){
+                for(u32 i=0;i<=(hClen+4);i++){
                     cll[i] = bitReader.readBitsLE(3);
                 }
                 HuffmanTree clTree;
                 u32 symbols[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
                 clTree.setCodeLengths(symbols,cll,19);
+                
+                std::vector<u32> literalLengthCodeLength;
+                literalLengthCodeLength.reserve(hLit+257);
+                for(u32 i=0;i<(hLit+257);i++){
+                    u32 bitCount = 0;
+                    //get encoded literal/length's code lengths
+                    u32 code = clTree.decode(bitReader,bitCount);
+                    if(code == 0xffffffff)return false;
+                    bitReader.skipBits(bitCount);
+
+                    if(code <= 15){
+                        literalLengthCodeLength.push_back(code);
+                    }else if(code == 16){
+                        u32 repeatLength = bitReader.readBitsLE(2);
+                        u32 prevSymbol = literalLengthCodeLength.at(literalLengthCodeLength.size()-1);
+                        for(u32 i=0;i<(repeatLength+3);i++){
+                            literalLengthCodeLength.push_back(prevSymbol);
+                        }
+                    }else if(code == 17){
+                        u32 repeatLength = bitReader.readBitsLE(3);
+                        for(u32 i=0;i<(repeatLength+3);i++){
+                            literalLengthCodeLength.push_back(0);
+                        }
+                    }else if(code == 18){
+                        u32 repeatLength = bitReader.readBitsLE(7);
+                        for(u32 i=0;i<(repeatLength+11);i++){
+                            literalLengthCodeLength.push_back(0);
+                        }
+                    }
+                }
+                
+                std::cout << "LiteralLengthCodeSize: " << literalLengthCodeLength.size()<<"\n";
+                HuffmanTree literalLengthTree;
+                std::vector<u32> literalSymbols;
+                literalSymbols.reserve(literalLengthCodeLength.size());
+                for(int i=0;i<literalLengthCodeLength.size();i++)literalSymbols.push_back(i);
+                literalLengthTree.setCodeLengths(literalSymbols.data(),literalLengthCodeLength.data(),literalLengthCodeLength.size());
+                // for(int i=0;i<literalLengthCodeLength.size();i++){
+                //     std::cout << "literal i: "<< i << " value: "<< literalLengthCodeLength.at(i) << "\n";
+                // }
 
                 std::cout << "HLIT: "<<hLit<<"\n";
                 std::cout << "HDIST: "<<hDist<<"\n";
@@ -497,10 +537,11 @@ int main(int argc,char* argv[]) {
 
         // std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
     }else{
+        std::cerr << "Failed to parse the PNG\n";
         return 1;
     }
     defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
-    //std::cout<<"Successfully parsed the png\n";
+    std::cout<<"Successfully parsed the png\n";
     //temperory for quick access
     system("start imageoutput.ppm");
     return 0;

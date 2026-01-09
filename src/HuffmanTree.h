@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include "BitReader.h"
 
 typedef unsigned char u8;
 typedef unsigned int u32;
@@ -14,6 +15,7 @@ struct BitRange{
 
 struct HuffmanTree{
     u8 maxBit=0;
+    u8 minBit=0;
     std::vector<u32> ncodes;
     std::vector<u32> firstCode;
     std::vector<u32> firstSymbol;
@@ -24,6 +26,7 @@ struct HuffmanTree{
     void initializeStaticDeflateTree();
     void setMaxBit(u8 maxCount);
     bool getKMI(u32 cLen[],u32 cLenSize);
+    u32 decode(const BitReader& br,u32& bitlength);
 };
 
 #endif

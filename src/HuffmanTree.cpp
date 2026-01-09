@@ -2,6 +2,8 @@
 #include <math.h>
 #include <iostream>
 #include <algorithm>
+
+
 void HuffmanTree::initializeStaticDeflateTree(){
     /*
         Lit Value   Bits    Codes
@@ -166,26 +168,25 @@ void HuffmanTree::setCodeLengths(u32 psymbols[],u32 cLen[],u32 cLenSize){
     symbolCLMap.erase(symbolCLMap.begin(),symbolCLMap.begin()+firstIndex);
 
     // for(const std::pair<u32,u32>& pair : symbolCLMap){
-    //     std::cout << "symbol: " << pair.first << " CL: " << pair.second << "\n";
+    //     std::cout << "Symbol: "<<pair.first<<"\tCodeLength: "<<pair.second<<"\n";
     // }
 
     std::vector<u32> vsymbols;
     std::vector<u32> vcodes;
     vsymbols.reserve(symbolCLMap.size());
     vcodes.reserve(symbolCLMap.size());
-
     for(const std::pair<u32,u32>& pair : symbolCLMap){
         vsymbols.push_back(pair.first);
         vcodes.push_back(pair.second);
     }
 
-    u32 maxBit = vcodes.at(vcodes.size()-1);
-    setMaxBit(maxBit);
+    minBit = vcodes.at(0);
+    setMaxBit(vcodes.at(vcodes.size()-1));
 
     //Generate codes
     u32 code = 0;
     int fsi = 0;
-    for(u32 i = vcodes.at(0);i<=maxBit;i++){
+    for(u32 i = minBit; i <= maxBit; i++){
         ncodes.at(i) = std::count(vcodes.begin(),vcodes.end(),i);
         code = (code + ncodes.at(i-1)) << 1;
         fsi += ncodes.at(i-1);
@@ -193,11 +194,31 @@ void HuffmanTree::setCodeLengths(u32 psymbols[],u32 cLen[],u32 cLenSize){
         firstSymbol.at(i) = fsi;
     }
 
-    // std::cout << "---Tree---\n";
-    // for(int i=vcodes.at(0);i<=maxBit;i++){
-    //     std::cout << "bitlength: "<<i<<":\n";
-    //     std::cout << "firstCode: "<<firstCode.at(i)<<"\n";
-    //     std::cout << "firstSymbol: "<<firstSymbol.at(i)<<"\n";
-    //     std::cout << "ncodes: "<<ncodes.at(i)<<"\n\n";
-    // }
+    symbols = vsymbols;
+
+    std::cout << "---TREE---\n";
+    for(u32 i=minBit;i<=maxBit;i++){
+        std::cout << "Bit Length: "<<i<<"\n";
+        std::cout << "ncodes: "<<ncodes.at(i)<<"\n";
+        std::cout << "firstCode: "<<firstCode.at(i)<<"\n";
+        std::cout << "firstSymbol: "<<firstSymbol.at(i)<<"\n\n";
+    }
+}
+
+u32 HuffmanTree::decode(const BitReader& br,u32& bitlength){
+    u32 symbol = 0;
+
+    for(u32 i = minBit;i<=maxBit;i++){
+        u32 code = br.peekBits(i);
+        if(code >= firstCode.at(i) && code < (firstCode.at(i) + ncodes.at(i))){
+            u32 index = firstSymbol.at(i) + (code - firstCode.at(i));
+            symbol = symbols.at(index);
+            bitlength = i;
+            return symbol;
+        }
+    }
+
+    std::cerr << "No codes matched in BitReader::decode()\n";
+
+    return 0xffffffff;
 }
