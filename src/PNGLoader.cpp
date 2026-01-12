@@ -366,6 +366,14 @@ public:
                 //     std::cout << "literal i: "<< i << " value: "<< literalLengthCodeLength.at(i) << "\n";
                 // }
 
+                for(u32 i=0;i<(hDist+1);i++){
+                    u32 bitCount = 0;
+                    //get encoded distance code lengths
+                    u32 code = clTree.decode(bitReader,bitCount);
+                    if(code == 0xffffffff)return false;
+                    bitReader.skipBits(bitCount);
+                }
+
                 std::cout << "HLIT: "<<hLit<<"\n";
                 std::cout << "HDIST: "<<hDist<<"\n";
                 std::cout << "HCLEN: "<<hClen<<"\n";
