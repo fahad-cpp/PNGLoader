@@ -488,7 +488,6 @@ const u8* createDefilteredBuffer(const u8* buffer,u32 width,u32 height){
         }
         prevScanline = currentScanline;
     }
-    //std::cout << "Buffer filtered.\n";
     return returnBuffer;
 }
 
@@ -532,18 +531,18 @@ int main(int argc,char* argv[]) {
     Parser parser;
     ParsedData parsedData;
     if (parser.parse(filepath, parsedData)) {
-        // std::cout<<"---PNG--info---\n";
-        // std::cout << "IHDR:\n";
-        // std::cout << "\tWidth: " << parsedData.width << "\n";
-        // std::cout << "\tHeight: " << parsedData.height << "\n";
-        // std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
-        // std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
-        // std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
-        // std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
-        // std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
-        // std::cout << "IDAT:\n";
+        std::cout<<"---PNG--info---\n";
+        std::cout << "IHDR:\n";
+        std::cout << "\tWidth: " << parsedData.width << "\n";
+        std::cout << "\tHeight: " << parsedData.height << "\n";
+        std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
+        std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
+        std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
+        std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
+        std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
+        std::cout << "IDAT:\n";
 
-        // std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
+        std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
     }else{
         std::cerr << "Failed to parse the PNG\n";
         return 1;
