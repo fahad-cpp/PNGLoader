@@ -7,6 +7,7 @@
 #include <math.h>
 #include "HuffmanTree.h"
 #include "BitReader.h"
+#include "Timer.h"
 
 typedef unsigned int u32;
 typedef unsigned char u8;
@@ -221,12 +222,12 @@ public:
             u32 compressionType = bitReader.readBitsLE(2);
             u16 blockLength = 0;
             if(compressionType == BTYPE_NO_COMPRESSION){
-                std::cout <<"Deflate block : BTYPE_NO_COMPRESSION\n";
+                //std::cout <<"Deflate block : BTYPE_NO_COMPRESSION\n";
                 //skip header
                 bitReader.skipCurByte(1);
                 //Read LEN(2B)
                 blockLength = bitReader.readBitsLE(16);
-                std::cout<<"Block length : "<<blockLength<<"\n";
+                //std::cout<<"Block length : "<<blockLength<<"\n";
                 //Read NLEN(2B)
                 u16 nlen = bitReader.readBitsLE(16);
                 //check validity
@@ -530,17 +531,18 @@ int main(int argc,char* argv[]) {
     const std::string filepath = argc<2?"res/test.png":argv[1];
     Parser parser;
     ParsedData parsedData;
+    Timer timer;
     if (parser.parse(filepath, parsedData)) {
-        std::cout<<"---PNG--info---\n";
-        std::cout << "IHDR:\n";
-        std::cout << "\tWidth: " << parsedData.width << "\n";
-        std::cout << "\tHeight: " << parsedData.height << "\n";
-        std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
-        std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
-        std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
-        std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
-        std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
-        std::cout << "IDAT:\n";
+        // std::cout<<"---PNG--info---\n";
+        // std::cout << "IHDR:\n";
+        // std::cout << "\tWidth: " << parsedData.width << "\n";
+        // std::cout << "\tHeight: " << parsedData.height << "\n";
+        // std::cout << "\tBits per channel: " << int(parsedData.bpp) << "\n";
+        // std::cout << "\tColor type: " << int(parsedData.colorType) << " (" << colorTypes[parsedData.colorType] << ")\n";
+        // std::cout << "\tCompression Method: " << int(parsedData.compressionMethod) << "\n";
+        // std::cout << "\tFilter Method: " << int(parsedData.filterMethod) << "\n";
+        // std::cout << "\tInterlace Method: " << int(parsedData.interlaceMethod) << (parsedData.interlaceMethod?(" (Adam7 Interlace)"):(" (No interlace)")) << "\n";
+        // std::cout << "IDAT:\n";
 
         std::cout << std::fixed << "image data size: " << parsedData.imageData.size()<< " Bytes\n";
     }else{
@@ -548,6 +550,8 @@ int main(int argc,char* argv[]) {
         return 1;
     }
     defilterAndOutput(parsedData.imageData.data(),parsedData.width,parsedData.height);
+    timer.stop();
+    std::cout << "Parsing took:" << timer.dtms << "ms\n";
     std::cout<<"Successfully parsed the png\n";
     //temperory for quick access
     system("start imageoutput.ppm");
