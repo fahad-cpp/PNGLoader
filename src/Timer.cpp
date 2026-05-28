@@ -1,10 +1,10 @@
 #include "Timer.h"
 
-Timer::Timer(){
+Timer::Timer() {
     start = std::chrono::high_resolution_clock::now();
 }
 
-void Timer::stop(){
+void Timer::stop() {
     end = std::chrono::high_resolution_clock::now();
 
     long long startT = std::chrono::time_point_cast<std::chrono::milliseconds>(start).time_since_epoch().count();
@@ -15,6 +15,5 @@ void Timer::stop(){
     dtms = (double)dur;
 }
 
-Timer::~Timer(){
-    
+Timer::~Timer() {
 }

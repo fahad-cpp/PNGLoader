@@ -3,11 +3,11 @@
 
 #include <chrono>
 
-class Timer{
-    //TODO:make a timer for measuring performance
+class Timer {
     std::chrono::high_resolution_clock::time_point start;
     std::chrono::high_resolution_clock::time_point end;
-    public:
+
+  public:
     double dtms;
     Timer();
     ~Timer();

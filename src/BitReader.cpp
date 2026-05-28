@@ -1,11 +1,9 @@
 #include "BitReader.h"
-#include <iostream>
 
-
-u32 BitReader:: readBit(){
+u32 BitReader::readBit() {
     u32 bit = (*reader >> bitOffset) & 1;
     bitOffset++;
-    if(bitOffset == 8){
+    if (bitOffset == 8) {
         bitOffset = 0;
         reader++;
         bytesPushed++;
@@ -13,32 +11,32 @@ u32 BitReader:: readBit(){
     return bit;
 }
 
-u32 BitReader::readBits(u8 bitCount){
-    if(bitCount > 32){
+u32 BitReader::readBits(u8 bitCount) {
+    if (bitCount > 32) {
         bitCount = 32;
     }
     u32 code = 0;
-    for(u8 i=1;i<=bitCount;i++){
+    for (u8 i = 1; i <= bitCount; i++) {
         code = (code << 1) | readBit();
     }
-    
+
     return code;
 }
-//Little Endian
-u32 BitReader::readBitsLE(u8 bitCount){
-    if(bitCount > 32){
+// Little Endian
+u32 BitReader::readBitsLE(u8 bitCount) {
+    if (bitCount > 32) {
         bitCount = 32;
     }
     u32 code = 0;
-    for(u8 i=0;i<bitCount;i++){
+    for (u8 i = 0; i < bitCount; i++) {
         code = code | (readBit() << i);
     }
-    
+
     return code;
 }
-u32 BitReader::peekBits(u32 bitCount) const{
+u32 BitReader::peekBits(u32 bitCount) const {
     u32 code = 0;
-    for(int i=0;i<bitCount;i++){
+    for (int i = 0; i < bitCount; i++) {
         u32 globalPos = bitOffset + i;
         u32 byte = reader[globalPos / 8];
         u32 bit = (byte >> (globalPos % 8)) & 1;
@@ -47,16 +45,16 @@ u32 BitReader::peekBits(u32 bitCount) const{
     return code;
 }
 
-void BitReader::skipBit(){
+void BitReader::skipBit() {
     bitOffset++;
-    if(bitOffset == 8){
+    if (bitOffset == 8) {
         bitOffset = 0;
         bytesPushed++;
         reader++;
     }
 }
 
-void BitReader::skipBits(u32 bitCount){
+void BitReader::skipBits(u32 bitCount) {
     bitOffset += bitCount;
     u32 bytesToSkip = (bitOffset / 8);
     bitOffset = bitOffset % 8;
@@ -64,7 +62,7 @@ void BitReader::skipBits(u32 bitCount){
     bytesPushed += bytesToSkip;
 }
 
-void BitReader::skipCurByte(u32 amount){
+void BitReader::skipCurByte(u32 amount) {
     reader += amount;
     bytesPushed += amount;
     bitOffset = 0;
